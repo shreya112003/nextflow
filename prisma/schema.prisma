@@ -1,0 +1,87 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflows Workflow[]
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String   @default("Untitled Workflow")
+  description String?
+  nodes       Json     @default("[]")
+  edges       Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  runs WorkflowRun[]
+
+  @@index([userId])
+}
+
+model WorkflowRun {
+  id         String        @id @default(cuid())
+  scope      RunScope      @default(FULL)
+  status     RunStatus     @default(RUNNING)
+  duration   Float?        // seconds
+  nodeIds    String[]      // which nodes were included
+  triggerJobId String?     // trigger.dev job id
+  createdAt  DateTime      @default(now())
+  finishedAt DateTime?
+
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  nodeResults NodeResult[]
+
+  @@index([workflowId])
+}
+
+model NodeResult {
+  id          String   @id @default(cuid())
+  nodeId      String   // matches node.id in Workflow.nodes JSON
+  nodeType    String
+  nodeLabel   String
+  status      RunStatus
+  output      String?  @db.Text
+  error       String?  @db.Text
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+
+  runId String
+  run   WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+enum RunScope {
+  FULL
+  SINGLE
+  SELECTED
+}
+
+enum RunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
