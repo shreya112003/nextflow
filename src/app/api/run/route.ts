@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
 
                     // Call Trigger.dev task in production; simulate in dev
                     if (process.env.TRIGGER_API_KEY && process.env.TRANSLOADIT_KEY) {
-                      const { runs } = await import("@trigger.dev/sdk/v3");
-                      const result = await runs.triggerAndWait("crop-image", {
+                      const { tasks } = await import("@trigger.dev/sdk/v3");
+                      const result = await tasks.triggerAndWait("crop-image", {
                         imageUrl,
                         ...(node.value as object),
                         transloaditKey: process.env.TRANSLOADIT_KEY,
@@ -111,8 +111,8 @@ export async function POST(req: NextRequest) {
                     if (!videoUrl) throw new Error("No video input connected");
 
                     if (process.env.TRIGGER_API_KEY && process.env.TRANSLOADIT_KEY) {
-                      const { runs } = await import("@trigger.dev/sdk/v3");
-                      const result = await runs.triggerAndWait("extract-frame", {
+                      const { tasks } = await import("@trigger.dev/sdk/v3");
+                      const result = await tasks.triggerAndWait("extract-frame", {
                         videoUrl,
                         timestamp: v?.timestamp ?? "50%",
                         transloaditKey: process.env.TRANSLOADIT_KEY,
@@ -130,8 +130,8 @@ export async function POST(req: NextRequest) {
                     const imageUrls = [inputs["image"]].filter(Boolean) as string[];
 
                     if (process.env.TRIGGER_API_KEY) {
-                      const { runs } = await import("@trigger.dev/sdk/v3");
-                      const result = await runs.triggerAndWait("llm-node", {
+                      const { tasks } = await import("@trigger.dev/sdk/v3");
+                      const result = await tasks.triggerAndWait("llm-node", {
                         model: v?.model ?? "gemini-1.5-flash",
                         systemPrompt,
                         userMessage,
