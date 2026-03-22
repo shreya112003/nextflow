@@ -1,4 +1,3 @@
-// src/app/workflow/page.tsx
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -9,27 +8,23 @@ export default async function WorkflowPage() {
   const { userId } = auth();
   if (!userId) redirect("/sign-in");
 
-  // Ensure user exists in DB
   let user = await prisma.user.findUnique({ where: { clerkId: userId } });
   if (!user) {
-    const clerkUser = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-    }).then((r) => r.json());
-
     user = await prisma.user.create({
-      data: {
-        clerkId: userId,
-        email: clerkUser.email_addresses?.[0]?.email_address ?? "",
-        name: `${clerkUser.first_name ?? ""} ${clerkUser.last_name ?? ""}`.trim(),
-      },
+      data: { clerkId: userId, email: "", name: "" },
     });
   }
 
-  // Load most recent workflow or create sample
   let workflow = await prisma.workflow.findFirst({
     where: { userId: user.id },
     orderBy: { updatedAt: "desc" },
-    include: { runs: { include: { nodeResults: true }, orderBy: { createdAt: "desc" }, take: 20 } },
+    include: {
+      runs: {
+        include: { nodeResults: true },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      },
+    },
   });
 
   if (!workflow) {
@@ -40,7 +35,13 @@ export default async function WorkflowPage() {
         nodes: SAMPLE_NODES as any,
         edges: SAMPLE_EDGES as any,
       },
-      include: { runs: { include: { nodeResults: true }, orderBy: { createdAt: "desc" }, take: 20 } },
+      include: {
+        runs: {
+          include: { nodeResults: true },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
     });
   }
 
@@ -53,8 +54,8 @@ export default async function WorkflowPage() {
         edges: workflow.edges as any,
         history: workflow.runs.map((run) => ({
           id: run.id,
-          scope: run.scope,
-          status: run.status,
+          scope: run.scope as "FULL" | "SINGLE" | "SELECTED",
+          status: run.status as "RUNNING" | "SUCCESS" | "FAILED" | "PARTIAL",
           duration: run.duration ?? undefined,
           nodeIds: run.nodeIds,
           createdAt: run.createdAt,
@@ -63,7 +64,7 @@ export default async function WorkflowPage() {
             nodeId: nr.nodeId,
             nodeType: nr.nodeType,
             nodeLabel: nr.nodeLabel,
-            status: nr.status,
+            status: nr.status as "RUNNING" | "SUCCESS" | "FAILED",
             output: nr.output ?? undefined,
             error: nr.error ?? undefined,
             durationMs: nr.durationMs ?? undefined,
