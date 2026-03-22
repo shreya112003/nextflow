@@ -100,7 +100,7 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
                 value={(node.value as { systemPrompt?: string })?.systemPrompt ?? ""}
                 onChange={(e) => patchValue({ systemPrompt: e.target.value })}
                 rows={2}
-                placeholder="Optional system instructions…"
+                placeholder="Optional system instructionsâ€¦"
                 className="inspector-input resize-none"
                 style={{ borderColor: color + "30" }}
               />
@@ -110,7 +110,7 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
                 value={(node.value as { userMessage?: string })?.userMessage ?? ""}
                 onChange={(e) => patchValue({ userMessage: e.target.value })}
                 rows={2}
-                placeholder="Used when no upstream text node is connected…"
+                placeholder="Used when no upstream text node is connectedâ€¦"
                 className="inspector-input resize-none"
                 style={{ borderColor: color + "30" }}
               />
@@ -176,7 +176,7 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
               className="text-[10px] font-mono rounded-md p-2 break-all leading-relaxed"
               style={{ background: "#0a0a14", border: `1px solid ${color}20`, color: "#50d070" }}
             >
-              {node.output.slice(0, 300)}{node.output.length > 300 ? "…" : ""}
+              {node.output.slice(0, 300)}{node.output.length > 300 ? "â€¦" : ""}
             </div>
           </Field>
         )}
