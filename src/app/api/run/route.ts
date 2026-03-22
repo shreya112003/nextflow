@@ -1,4 +1,3 @@
-// src/app/api/run/route.ts
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -35,12 +34,7 @@ export async function POST(req: NextRequest) {
         : nodeIds ?? nodes.map((n) => n.id);
 
     const run = await prisma.workflowRun.create({
-      data: {
-        workflowId,
-        scope: scope as any,
-        status: "RUNNING",
-        nodeIds: targetIds,
-      },
+      data: { workflowId, scope: scope as any, status: "RUNNING", nodeIds: targetIds },
     });
 
     const encoder = new TextEncoder();
@@ -54,14 +48,7 @@ export async function POST(req: NextRequest) {
 
         const plan = buildExecutionPlan(nodes, edges, targetIds);
         const nodeOutputs = new Map<string, string | null>();
-        const nodeResults: {
-          nodeId: string;
-          status: string;
-          output?: string;
-          error?: string;
-          durationMs: number;
-        }[] = [];
-
+        const nodeResults: { nodeId: string; status: string; output?: string; error?: string; durationMs: number }[] = [];
         const startTime = Date.now();
 
         try {
@@ -84,34 +71,25 @@ export async function POST(req: NextRequest) {
                   if (node.type === "text") {
                     const v = node.value as { content: string };
                     output = v?.content ?? "";
-
                   } else if (node.type === "image" || node.type === "video") {
                     const v = node.value as { url: string | null };
                     output = v?.url ?? null;
-
                   } else if (node.type === "crop") {
                     const imageUrl = inputs["default"] ?? inputs["image"] ?? null;
                     if (!imageUrl) throw new Error("No image input connected");
                     await new Promise((r) => setTimeout(r, 1200));
                     output = imageUrl + "?crop=true";
-
                   } else if (node.type === "extract") {
                     const videoUrl = inputs["default"] ?? inputs["video_url"] ?? null;
                     const v = node.value as { timestamp: string };
                     if (!videoUrl) throw new Error("No video input connected");
                     await new Promise((r) => setTimeout(r, 1500));
                     output = videoUrl + "?frame=" + (v?.timestamp ?? "50pct");
-
                   } else if (node.type === "llm") {
-                    const v = node.value as {
-                      model: string;
-                      systemPrompt?: string;
-                      userMessage?: string;
-                    };
+                    const v = node.value as { model: string; systemPrompt?: string; userMessage?: string };
                     const systemPrompt = inputs["system"] ?? v?.systemPrompt ?? "";
                     const userMessage = inputs["user"] ?? v?.userMessage ?? "Hello";
                     const imageUrls = [inputs["image"]].filter(Boolean) as string[];
-
                     output = await runGemini({
                       model: (v?.model ?? "gemini-1.5-flash") as any,
                       systemPrompt: systemPrompt || undefined,
@@ -130,14 +108,8 @@ export async function POST(req: NextRequest) {
 
                 await prisma.nodeResult.create({
                   data: {
-                    runId: run.id,
-                    nodeId,
-                    nodeType: node.type,
-                    nodeLabel: node.label,
-                    status: status as any,
-                    output: output ?? null,
-                    error: error ?? null,
-                    durationMs,
+                    runId: run.id, nodeId, nodeType: node.type, nodeLabel: node.label,
+                    status: status as any, output: output ?? null, error: error ?? null, durationMs,
                   },
                 });
 
@@ -148,10 +120,7 @@ export async function POST(req: NextRequest) {
 
           const duration = (Date.now() - startTime) / 1000;
           const overallStatus = nodeResults.every((r) => r.status === "SUCCESS")
-            ? "SUCCESS"
-            : nodeResults.some((r) => r.status === "SUCCESS")
-            ? "PARTIAL"
-            : "FAILED";
+            ? "SUCCESS" : nodeResults.some((r) => r.status === "SUCCESS") ? "PARTIAL" : "FAILED";
 
           await prisma.workflowRun.update({
             where: { id: run.id },
@@ -172,11 +141,7 @@ export async function POST(req: NextRequest) {
     });
 
     return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
     });
   } catch (e) {
     if (e instanceof z.ZodError) {
