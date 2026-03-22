@@ -8,7 +8,6 @@ import { runGemini } from "@/lib/gemini";
 import type { WorkflowNode, WorkflowEdge } from "@/types";
 import { z } from "zod";
 
-// We use Server-Sent Events so the client gets live node status updates
 export async function POST(req: NextRequest) {
   try {
     const { userId } = auth();
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest) {
     const nodes = workflow.nodes as unknown as WorkflowNode[];
     const edges = workflow.edges as unknown as WorkflowEdge[];
 
-    // Determine which nodes to run
     const targetIds =
       scope === "FULL"
         ? nodes.map((n) => n.id)
@@ -36,7 +34,6 @@ export async function POST(req: NextRequest) {
         ? [nodeIds[0]]
         : nodeIds ?? nodes.map((n) => n.id);
 
-    // Create run record
     const run = await prisma.workflowRun.create({
       data: {
         workflowId,
@@ -46,7 +43,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Use SSE stream for real-time updates
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -58,13 +54,18 @@ export async function POST(req: NextRequest) {
 
         const plan = buildExecutionPlan(nodes, edges, targetIds);
         const nodeOutputs = new Map<string, string | null>();
-        const nodeResults: { nodeId: string; status: string; output?: string; error?: string; durationMs: number }[] = [];
+        const nodeResults: {
+          nodeId: string;
+          status: string;
+          output?: string;
+          error?: string;
+          durationMs: number;
+        }[] = [];
 
         const startTime = Date.now();
 
         try {
           for (const tier of plan.tiers) {
-            // Run all nodes in this tier concurrently
             await Promise.all(
               tier.map(async (nodeId) => {
                 const node = nodes.find((n) => n.id === nodeId);
@@ -83,70 +84,40 @@ export async function POST(req: NextRequest) {
                   if (node.type === "text") {
                     const v = node.value as { content: string };
                     output = v?.content ?? "";
+
                   } else if (node.type === "image" || node.type === "video") {
                     const v = node.value as { url: string | null };
                     output = v?.url ?? null;
+
                   } else if (node.type === "crop") {
                     const imageUrl = inputs["default"] ?? inputs["image"] ?? null;
                     if (!imageUrl) throw new Error("No image input connected");
+                    await new Promise((r) => setTimeout(r, 1200));
+                    output = imageUrl + "?crop=true";
 
-                    // Call Trigger.dev task in production; simulate in dev
-                    if (process.env.TRIGGER_API_KEY && process.env.TRANSLOADIT_KEY) {
-                      const { tasks } = await import("@trigger.dev/sdk/v3");
-                      const result = await tasks.triggerAndWait("crop-image", {
-                        imageUrl,
-                        ...(node.value as object),
-                        transloaditKey: process.env.TRANSLOADIT_KEY,
-                        transloaditSecret: process.env.TRANSLOADIT_SECRET,
-                      });
-                      output = (result.output as any)?.output ?? null;
-                    } else {
-                      // Dev simulation
-                      await new Promise((r) => setTimeout(r, 1200));
-                      output = imageUrl + "?crop=true";
-                    }
                   } else if (node.type === "extract") {
                     const videoUrl = inputs["default"] ?? inputs["video_url"] ?? null;
                     const v = node.value as { timestamp: string };
                     if (!videoUrl) throw new Error("No video input connected");
+                    await new Promise((r) => setTimeout(r, 1500));
+                    output = videoUrl + "?frame=" + (v?.timestamp ?? "50pct");
 
-                    if (process.env.TRIGGER_API_KEY && process.env.TRANSLOADIT_KEY) {
-                      const { tasks } = await import("@trigger.dev/sdk/v3");
-                      const result = await tasks.triggerAndWait("extract-frame", {
-                        videoUrl,
-                        timestamp: v?.timestamp ?? "50%",
-                        transloaditKey: process.env.TRANSLOADIT_KEY,
-                        transloaditSecret: process.env.TRANSLOADIT_SECRET,
-                      });
-                      output = (result.output as any)?.output ?? null;
-                    } else {
-                      await new Promise((r) => setTimeout(r, 1500));
-                      output = videoUrl + "?frame=50pct";
-                    }
                   } else if (node.type === "llm") {
-                    const v = node.value as { model: string; systemPrompt?: string; userMessage?: string };
+                    const v = node.value as {
+                      model: string;
+                      systemPrompt?: string;
+                      userMessage?: string;
+                    };
                     const systemPrompt = inputs["system"] ?? v?.systemPrompt ?? "";
                     const userMessage = inputs["user"] ?? v?.userMessage ?? "Hello";
                     const imageUrls = [inputs["image"]].filter(Boolean) as string[];
 
-                    if (process.env.TRIGGER_API_KEY) {
-                      const { tasks } = await import("@trigger.dev/sdk/v3");
-                      const result = await tasks.triggerAndWait("llm-node", {
-                        model: v?.model ?? "gemini-1.5-flash",
-                        systemPrompt,
-                        userMessage,
-                        imageUrls,
-                      });
-                      output = (result.output as any)?.output ?? null;
-                    } else {
-                      // Direct Gemini call (dev without Trigger.dev)
-                      output = await runGemini({
-                        model: (v?.model ?? "gemini-1.5-flash") as any,
-                        systemPrompt: systemPrompt || undefined,
-                        userMessage,
-                        imageUrls,
-                      });
-                    }
+                    output = await runGemini({
+                      model: (v?.model ?? "gemini-1.5-flash") as any,
+                      systemPrompt: systemPrompt || undefined,
+                      userMessage,
+                      imageUrls,
+                    });
                   }
                 } catch (e) {
                   status = "FAILED";
@@ -157,7 +128,6 @@ export async function POST(req: NextRequest) {
                 nodeOutputs.set(nodeId, output);
                 nodeResults.push({ nodeId, status, output: output ?? undefined, error, durationMs });
 
-                // Persist node result
                 await prisma.nodeResult.create({
                   data: {
                     runId: run.id,
