@@ -1,4 +1,3 @@
-// src/components/ui/NodeInspector.tsx
 "use client";
 import { useRef } from "react";
 import { X, Play } from "lucide-react";
@@ -30,12 +29,11 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // In production this would go through Transloadit
-    // For now, create an object URL for preview
     const url = URL.createObjectURL(file);
     patchValue({ url, fileName: file.name, mimeType: file.type });
   };
+
+  const cropValue = node.value as Record<string, unknown>;
 
   return (
     <div
@@ -64,7 +62,6 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
       </div>
 
       <div className="px-5 py-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Label */}
         <Field label="Node label">
           <input
             value={node.label}
@@ -74,7 +71,6 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
           />
         </Field>
 
-        {/* Text node */}
         {node.type === "text" && (
           <Field label="Text content" colSpan>
             <textarea
@@ -87,7 +83,6 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
           </Field>
         )}
 
-        {/* LLM node */}
         {node.type === "llm" && (
           <>
             <Field label="Model">
@@ -105,7 +100,7 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
                 value={(node.value as { systemPrompt?: string })?.systemPrompt ?? ""}
                 onChange={(e) => patchValue({ systemPrompt: e.target.value })}
                 rows={2}
-                placeholder="Optional system instructionsâ€¦"
+                placeholder="Optional system instructions…"
                 className="inspector-input resize-none"
                 style={{ borderColor: color + "30" }}
               />
@@ -115,7 +110,7 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
                 value={(node.value as { userMessage?: string })?.userMessage ?? ""}
                 onChange={(e) => patchValue({ userMessage: e.target.value })}
                 rows={2}
-                placeholder="Used when no upstream text node is connectedâ€¦"
+                placeholder="Used when no upstream text node is connected…"
                 className="inspector-input resize-none"
                 style={{ borderColor: color + "30" }}
               />
@@ -123,14 +118,13 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
           </>
         )}
 
-        {/* Crop node */}
         {node.type === "crop" && (
           <>
             {(["x", "y", "width", "height"] as const).map((k) => (
-              <Field key={k} label={`${k === "width" ? "Width %" : k === "height" ? "Height %" : k + " offset %"}`}>
+              <Field key={k} label={k === "width" ? "Width %" : k === "height" ? "Height %" : k + " offset %"}>
                 <input
                   type="number" min={0} max={100}
-                  value={(node.value as Record<string, number>)?.[k] ?? 0}
+                  value={(cropValue?.[k] as number) ?? 0}
                   onChange={(e) => patchValue({ [k]: Number(e.target.value) })}
                   className="inspector-input"
                   style={{ borderColor: color + "30" }}
@@ -140,7 +134,6 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
           </>
         )}
 
-        {/* Extract frame node */}
         {node.type === "extract" && (
           <Field label='Timestamp ("50%" or seconds)'>
             <input
@@ -153,7 +146,6 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
           </Field>
         )}
 
-        {/* Image / video upload */}
         {(node.type === "image" || node.type === "video") && (
           <Field label={node.type === "image" ? "Upload image" : "Upload video"} colSpan>
             <div className="flex items-center gap-3">
@@ -175,20 +167,16 @@ export default function NodeInspector({ node, onClose, onRunSingle }: Props) {
                 className="hidden"
               />
             </div>
-            <p className="text-[9px] text-[#3a3a5a] mt-1">
-              In production, files upload via Transloadit. Local preview uses object URLs.
-            </p>
           </Field>
         )}
 
-        {/* Output display */}
         {node.output && (
           <Field label="Last output" colSpan>
             <div
               className="text-[10px] font-mono rounded-md p-2 break-all leading-relaxed"
               style={{ background: "#0a0a14", border: `1px solid ${color}20`, color: "#50d070" }}
             >
-              {node.output.slice(0, 300)}{node.output.length > 300 ? "â€¦" : ""}
+              {node.output.slice(0, 300)}{node.output.length > 300 ? "…" : ""}
             </div>
           </Field>
         )}
